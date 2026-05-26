@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WebGL Test</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+        canvas { display: block; }
+        #info { position: absolute; top: 10px; left: 10px; color: #0f0; font-family: monospace; z-index: 10; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div id="info">WebGL Test - Si ves particulas verdes, funciona</div>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 1);
+        document.body.appendChild(renderer.domElement);
+
+        const geometry = new THREE.BufferGeometry();
+        const count = 1000;
+        const positions = new Float32Array(count * 3);
+        for(let i=0; i<count*3; i++) positions[i] = (Math.random()-0.5)*100;
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+        const material = new THREE.PointsMaterial({ color: 0x00ff88, size: 0.5 });
+        const particles = new THREE.Points(geometry, material);
+        scene.add(particles);
+        camera.position.z = 50;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            particles.rotation.y += 0.002;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth/window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

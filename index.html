@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Experience | THE-KERN3L</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg: #050508;
+            --accent: #00ff88;
+            --accent-dim: rgba(0,255,136,0.1);
+            --text: #ffffff;
+            --text-dim: rgba(255,255,255,0.5);
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: transparent;
+            color: var(--text);
+            overflow-x: hidden;
+            cursor: none;
+        }
+        
+        /* Custom Cursor */
+        .cursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            transition: transform 0.15s ease, width 0.3s, height 0.3s;
+            mix-blend-mode: difference;
+        }
+        .cursor.hover {
+            width: 60px;
+            height: 60px;
+            background: var(--accent-dim);
+        }
+        .cursor-dot {
+            position: fixed;
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+        }
+        
+        /* WebGL Canvas */
+        #webgl-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        
+        /* Navigation */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            mix-blend-mode: difference;
+        }
+        .nav-logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--text);
+            text-decoration: none;
+        }
+        .nav-logo span { color: var(--accent); }
+        .nav-links {
+            display: flex;
+            gap: 2.5rem;
+        }
+        .nav-link {
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 400;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            transition: color 0.3s;
+        }
+        .nav-link:hover { color: var(--accent); }
+        
+        /* Hero Section */
+        .hero {
+            position: relative;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+        }
+        .hero-content {
+            text-align: center;
+            max-width: 900px;
+            padding: 0 2rem;
+        }
+        .hero-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            opacity: 0;
+        }
+        .hero-eyebrow .line {
+            width: 40px;
+            height: 1px;
+            background: var(--accent);
+        }
+        .hero-eyebrow span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--accent);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+        .hero-title {
+            font-size: clamp(3rem, 8vw, 7rem);
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: -0.03em;
+            margin-bottom: 1.5rem;
+        }
+        .hero-title .glitch {
+            display: inline-block;
+            position: relative;
+            color: var(--text);
+        }
+        .hero-title .glitch::before,
+        .hero-title .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .hero-title .glitch::before {
+            color: #ff0080;
+            animation: glitch-1 2s infinite;
+            clip-path: polygon(0 0, 100% 0, 100% 35%, 0 35%);
+        }
+        .hero-title .glitch::after {
+            color: #00ff88;
+            animation: glitch-2 2s infinite;
+            clip-path: polygon(0 65%, 100% 65%, 100% 100%, 0 100%);
+        }
+        @keyframes glitch-1 {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translate(-3px, 3px); }
+            40% { transform: translate(3px, -3px); }
+            60% { transform: translate(-3px, 0); }
+            80% { transform: translate(3px, 0); }
+        }
+        @keyframes glitch-2 {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translate(3px, -3px); }
+            40% { transform: translate(-3px, 3px); }
+            60% { transform: translate(3px, 0); }
+            80% { transform: translate(-3px, 0); }
+        }
+        .hero-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-dim);
+            font-weight: 300;
+            max-width: 500px;
+            margin: 0 auto 3rem;
+            line-height: 1.6;
+        }
+        .hero-cta {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+        }
+        .btn {
+            padding: 1rem 2.5rem;
+            border-radius: 100px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            text-decoration: none;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+        }
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 40px rgba(0,255,136,0.3);
+        }
+        .btn-secondary {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn-secondary:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        
+        /* Scroll Indicator */
+        .scroll-indicator {
+            position: absolute;
+            bottom: 3rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            opacity: 0;
+        }
+        .scroll-indicator span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+        .scroll-line {
+            width: 1px;
+            height: 60px;
+            background: linear-gradient(to bottom, var(--accent), transparent);
+            animation: scroll-pulse 2s ease-in-out infinite;
+        }
+        @keyframes scroll-pulse {
+            0%, 100% { opacity: 0.3; transform: scaleY(0.5); }
+            50% { opacity: 1; transform: scaleY(1); }
+        }
+        
+        /* Features Section */
+        .features {
+            position: relative;
+            z-index: 1;
+            padding: 10rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .features-header {
+            text-align: center;
+            margin-bottom: 6rem;
+        }
+        .features-header h2 {
+            font-size: clamp(2rem, 5vw, 4rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+        .features-header p {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+        }
+        .feature-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 3rem 2rem;
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0,255,136,0.1), transparent 50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(0,255,136,0.2);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(0,255,136,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .feature-card h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+        .feature-card p {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        
+        /* 3D Showcase Section */
+        .showcase {
+            position: relative;
+            z-index: 1;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .showcase-content {
+            text-align: center;
+            z-index: 2;
+            position: relative;
+        }
+        .showcase h2 {
+            font-size: clamp(2rem, 6vw, 5rem);
+            font-weight: 900;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .showcase p {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        /* Footer */
+        .footer {
+            position: relative;
+            z-index: 1;
+            padding: 4rem 2rem;
+            text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .footer-logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .footer-logo span { color: var(--accent); }
+        .footer p {
+            color: var(--text-dim);
+            font-size: 0.875rem;
+        }
+        
+        @media (max-width: 768px) {
+            .features-grid { grid-template-columns: 1fr; }
+            .nav-links { display: none; }
+            .hero-cta { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Custom Cursor -->
+    <div class="cursor" id="cursor"></div>
+    <div class="cursor-dot" id="cursorDot"></div>
+    
+    <!-- WebGL Canvas -->
+    <canvas id="webgl-canvas"></canvas>
+    
+    <!-- Fallback background -->
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: -1;"></div>
+    
+    <!-- Navigation -->
+    <nav class="nav">
+        <a href="#" class="nav-logo">THE-KERN<span>3</span>L</a>
+        <div class="nav-links">
+            <a href="#features" class="nav-link">Features</a>
+            <a href="#showcase" class="nav-link">Showcase</a>
+            <a href="#about" class="nav-link">About</a>
+            <a href="#contact" class="nav-link">Contact</a>
+        </div>
+    </nav>
+    
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-eyebrow">
+                <div class="line"></div>
+                <span>WebGL Experience</span>
+                <div class="line"></div>
+            </div>
+            <h1 class="hero-title">
+                <span class="glitch" data-text="FUTURE">FUTURE</span><br>
+                IS NOW
+            </h1>
+            <p class="hero-subtitle">
+                Experiencias web inmersivas con Three.js, shaders y animaciones cinematográficas. 
+                El siguiente nivel de diseño interactivo.
+            </p>
+            <div class="hero-cta">
+                <a href="#features" class="btn btn-primary">Explorar</a>
+                <a href="https://github.com/mrcoder688" class="btn btn-secondary">GitHub</a>
+            </div>
+        </div>
+        <div class="scroll-indicator">
+            <span>Scroll</span>
+            <div class="scroll-line"></div>
+        </div>
+    </section>
+    
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="features-header">
+            <h2>Superpowers</h2>
+            <p>Tecnologías que hacen la diferencia</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🎲</div>
+                <h3>Three.js 3D</h3>
+                <p>Gráficos 3D en tiempo real con WebGL. Partículas, geometría procedural y efectos visuales avanzados.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">✨</div>
+                <h3>WebGL Shaders</h3>
+                <p>Shaders personalizados para efectos de distorsión, glow, ruido y transiciones fluidas entre estados.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎬</div>
+                <h3>GSAP Animation</h3>
+                <p>Animaciones cinematográficas con scroll-triggered effects, timelines complejas y easing personalizado.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🖱️</div>
+                <h3>Interactive</h3>
+                <p>Cursor personalizado, hover effects, parallax y respuesta en tiempo real a cada interacción del usuario.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>Responsive</h3>
+                <p>Diseño adaptable que mantiene la calidad visual en cualquier dispositivo, desde móvil hasta 4K.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Performance</h3>
+                <p>60fps garantizados con optimización de shaders, lazy loading y técnicas avanzadas de rendering.</p>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Showcase Section -->
+    <section class="showcase" id="showcase">
+        <div class="showcase-content">
+            <h2>READY TO BUILD?</h2>
+            <p>Transforma tu visión en una experiencia web inolvidable.</p>
+        </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-logo">THE-KERN<span>3</span>L</div>
+        <p>Built with Three.js + GSAP + WebGL</p>
+        <p style="margin-top: 0.5rem; opacity: 0.5;">© 2026</p>
+    </footer>
+    
+    <script src="js/particles.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
