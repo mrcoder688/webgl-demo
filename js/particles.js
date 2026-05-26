@@ -2,9 +2,24 @@
 class ParticleSystem {
     constructor() {
         this.canvas = document.getElementById('webgl-canvas');
+        
+        // Detect mobile/low-end device
+        this.isMobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768;
+        this.hasWebGL = this.checkWebGL();
+        
+        if (!this.hasWebGL || this.isMobile) {
+            this.showFallback();
+            return;
+        }
+        
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, alpha: true, antialias: true });
+        this.renderer = new THREE.WebGLRenderer({ 
+            canvas: this.canvas, 
+            alpha: true, 
+            antialias: !this.isMobile,
+            powerPreference: 'low-power'
+        });
         
         this.particles = null;
         this.particlePositions = null;
@@ -16,31 +31,108 @@ class ParticleSystem {
         this.init();
     }
     
+    checkWebGL() {
+        try {
+            const testCanvas = document.createElement('canvas');
+            return !!(window.WebGLRenderingContext && 
+                (testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl')));
+        } catch (e) {
+            return false;
+        }
+    }
+    
+    showFallback() {
+        // Create CSS particle fallback for mobile/no-WebGL
+        const fallback = document.createElement('div');
+        fallback.id = 'particle-fallback';
+        fallback.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            overflow: hidden;
+            background: radial-gradient(ellipse at center, #0a0a1a 0%, #050508 100%);
+        `;
+        
+        // Create CSS particles
+        const particleCount = this.isMobile ? 30 : 50;
+        for (let i = 0; i < particleCount; i++) {
+            const particle = document.createElement('div');
+            const size = Math.random() * 4 + 2;
+            const x = Math.random() * 100;
+            const y = Math.random() * 100;
+            const duration = Math.random() * 20 + 10;
+            const delay = Math.random() * -20;
+            const colors = ['#00ff88', '#0088ff', '#ff0080', '#00d4aa'];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            
+            particle.style.cssText = `
+                position: absolute;
+                width: ${size}px;
+                height: ${size}px;
+                background: ${color};
+                border-radius: 50%;
+                left: ${x}%;
+                top: ${y}%;
+                opacity: ${Math.random() * 0.5 + 0.2};
+                box-shadow: 0 0 ${size * 2}px ${color};
+                animation: float ${duration}s ${delay}s infinite ease-in-out;
+            `;
+            fallback.appendChild(particle);
+        }
+        
+        // Add floating animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes float {
+                0%, 100% { transform: translate(0, 0) scale(1); }
+                25% { transform: translate(${Math.random()*100-50}px, ${Math.random()*-50}px) scale(1.2); }
+                50% { transform: translate(${Math.random()*100-50}px, ${Math.random()*50}px) scale(0.8); }
+                75% { transform: translate(${Math.random()*-50}px, ${Math.random()*50}px) scale(1.1); }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        document.body.insertBefore(fallback, document.body.firstChild);
+        this.canvas.style.display = 'none';
+    }
+    
     init() {
-        // Setup renderer
+        // Setup renderer - lower pixel ratio on mobile
+        const pixelRatio = this.isMobile ? 1 : Math.min(window.devicePixelRatio, 2);
+        this.renderer.setPixelRatio(pixelRatio);
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.setClearColor(0x050508, 1);
         
         // Camera position
         this.camera.position.z = 50;
         
-        // Create particles
+        // Create particles - fewer on mobile
         this.createParticles();
         
-        // Create connection lines
-        this.createConnections();
+        // Create connection lines - skip on mobile
+        if (!this.isMobile) {
+            this.createConnections();
+        }
         
         // Event listeners
         window.addEventListener('resize', () => this.onResize());
-        window.addEventListener('mousemove', (e) => this.onMouseMove(e));
+        
+        if (this.isMobile) {
+            window.addEventListener('touchmove', (e) => this.onTouchMove(e), { passive: true });
+        } else {
+            window.addEventListener('mousemove', (e) => this.onMouseMove(e));
+        }
         
         // Start animation
         this.animate();
     }
     
     createParticles() {
-        const particleCount = 2000;
+        // Reduce particle count on mobile
+        const particleCount = this.isMobile ? 500 : 2000;
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(particleCount * 3);
         const colors = new Float32Array(particleCount * 3);
@@ -160,6 +252,8 @@ class ParticleSystem {
     }
     
     updateConnections() {
+        if (this.isMobile || !this.lines) return;
+        
         const positions = this.particlePositions;
         const linePositions = this.lines.geometry.attributes.position.array;
         let lineIndex = 0;
@@ -199,6 +293,13 @@ class ParticleSystem {
         this.targetMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     }
     
+    onTouchMove(event) {
+        if (event.touches.length > 0) {
+            this.targetMouse.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
+            this.targetMouse.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
+        }
+    }
+    
     onResize() {
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
@@ -215,14 +316,16 @@ class ParticleSystem {
         this.mouse.y += (this.targetMouse.y - this.mouse.y) * 0.05;
         
         // Update uniforms
-        if (this.particles.material.uniforms) {
+        if (this.particles && this.particles.material.uniforms) {
             this.particles.material.uniforms.uTime.value = this.time;
             this.particles.material.uniforms.uMouse.value = this.mouse;
         }
         
         // Rotate particle system slowly
-        this.particles.rotation.y += 0.001;
-        this.particles.rotation.x += 0.0005;
+        if (this.particles) {
+            this.particles.rotation.y += 0.001;
+            this.particles.rotation.x += 0.0005;
+        }
         
         // Update connections
         this.updateConnections();
